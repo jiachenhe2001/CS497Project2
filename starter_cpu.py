@@ -455,50 +455,6 @@ def train_model(model, opt, train_loader,valid_loader):
             torch.save(model.state_dict(), f"{opt.savename}_epoch_{epoch+1}.pth")
 
     print("Training complete.")
-
-
-    # train loop
-    # for epoch in range(opt.epochs):
-    #     print("epoch %d" % (epoch))
-    #     total_loss = 0
-    #     for inputs, targets in train_loader:
-    #         # Your training logic here
-    #         inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
-
-    #         # Forward pass
-    #         outputs = model(inputs)
-    #         loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-
-    #         # Backward and optimize
-    #         opt.optimizer.zero_grad()
-    #         loss.backward()
-    #         opt.optimizer.step()
-            
-    #         if opt.SGDR == True:
-    #             opt.sched.step()
-
-    #         total_train_loss += loss.item()
-            
-    #     avg_train_loss = total_train_loss / len(train_loader)
-    #     print(f"Train loss: {avg_train_loss}")
-            
-    
-    # # Validation loop
-    # model.eval()
-    # total_valid_loss = 0
-    # with torch.no_grad():
-    #     for inputs, targets in valid_loader:
-    #         inputs, targets = inputs.to(model.device), targets.to(model.device)
-    #         outputs = model(inputs)
-    #         loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-    #         total_valid_loss += loss.item()
-
-    # # Calculate average validation loss
-    # avg_valid_loss = total_valid_loss / len(valid_loader)
-    # print(f"Validation loss: {avg_valid_loss}")
-    
-    
-    
     
     # write code to:
     #  1. create a nopeak mask
