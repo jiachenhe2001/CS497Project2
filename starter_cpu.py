@@ -16,6 +16,7 @@ from torch.autograd import Variable
 from transformers import GPT2TokenizerFast
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 
 #change 
 class TextDataset(Dataset):
@@ -26,7 +27,8 @@ class TextDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        #return self.data[idx]
+        return torch.tensor(self.data[idx], dtype=torch.long)
 
 
 def read_corpus(filename,tokenizer):
@@ -385,76 +387,81 @@ def get_model(opt, src_vocab, trg_vocab):
     return model
     
 def train_model(model, opt, train_loader,valid_loader):
-    
-    print("training model...")
-    model.train()
-            # Set device based on availability of CUDA
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
+    model.to(opt.device)
+    optimizer = opt.optimizer
+    epochs = opt.epochs if hasattr(opt, 'epochs') else 10  # Default to 10 epochs if not specified
+    vocab_size = opt.vocab_size
+    target_pad = opt.trg_pad if hasattr(opt, 'trg_pad') else 0  # Default padding index
 
-    for epoch in range(opt.epochs):
-        #model.train()  # Set model to training mode
-        total_train_loss = 0
-        total_train_tokens = 0
+    for epoch in range(epochs):
+        model.train()  # Set model to training mode
+        total_loss = 0
+        start_time = time.time()
 
-        for batch in train_loader:
-            trg = batch.to(device)
+        for i, batch in enumerate(train_loader):
+            trg = batch.to(opt.device)
+            print(trg)
+            trg_input = trg[:, :-1]
+            targets = trg[:, 1:].contiguous().view(-1)
 
-            # Prepare input and targets by shifting
-            trg_input = trg[:-1]
-            trg_output = trg[1:]
-
-            # Create no-peek mask
-            trg_mask = (torch.tril(torch.ones((trg_input.size(1), trg_input.size(1)), device=device)) == 1)
+            trg_mask = create_masks(trg_input)
 
             optimizer.zero_grad()
             output = model(trg_input, trg_mask=trg_mask)
+            output_flat = output.view(-1, vocab_size)
 
-            output_flat = output.view(-1, output.size(-1))
-            trg_output_flat = trg_output.view(-1)
-
-            loss = F.cross_entropy(output_flat, trg_output_flat, ignore_index=opt.trg_pad)
+            loss = F.cross_entropy(output_flat, targets, ignore_index=target_pad)
             loss.backward()
             optimizer.step()
 
-            total_train_loss += loss.item() * (trg_output != opt.trg_pad).sum().item()
-            total_train_tokens += (trg_output != opt.trg_pad).sum().item()
+            total_loss += loss.item()
 
-        # Calculate training perplexity
-        train_perplexity = torch.exp(total_train_loss / total_train_tokens)
-        print(f"Epoch {epoch+1}, Training Perplexity: {train_perplexity:.4f}")
+            if (i + 1) % opt.print_every == 0:
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                average_loss = total_loss / opt.print_every
+                print(f"Time = {elapsed_time // 60:.0f}m, Epoch {epoch + 1}, Iter = {i + 1}, Loss = {average_loss:.3f}, {elapsed_time:.0f}s per {opt.print_every} iters")
+                total_loss = 0
+                start_time = current_time
 
-        # Validation phase
         model.eval()
-        total_valid_loss = 0
-        total_valid_tokens = 0
+        total_val_loss = 0
+        total_val_tokens = 0
+
         with torch.no_grad():
             for batch in valid_loader:
-                trg = batch.to(device)
+                trg = batch.to(opt.device)
+                trg_input = trg[:, :-1]
+                targets = trg[:, 1:].contiguous().view(-1)
+                trg_mask = create_masks(trg_input)
 
-                trg_input = trg[:-1]
-                trg_output = trg[1:]
-
-                trg_mask = (torch.tril(torch.ones((trg_input.size(1), trg_input.size(1)), device=device)) == 1)
                 output = model(trg_input, trg_mask=trg_mask)
+                output_flat = output.view(-1, vocab_size)
+                val_loss = F.cross_entropy(output_flat, targets, ignore_index=target_pad)
 
-                output_flat = output.view(-1, output.size(-1))
-                trg_output_flat = trg_output.view(-1)
+                total_val_loss += val_loss.item()
+                total_val_tokens += targets.ne(target_pad).sum().item()  # Count non-pad tokens
 
-                loss = F.cross_entropy(output_flat, trg_output_flat, ignore_index=opt.trg_pad)
+        val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
+        print(f"Validation Perplexity: {val_perplexity:.3f} after Epoch {epoch + 1}")
 
-                total_valid_loss += loss.item() * (trg_output != opt.trg_pad).sum().item()
-                total_valid_tokens += (trg_output != opt.trg_pad).sum().item()
+        if hasattr(opt, 'SGDR') and opt.SGDR:
+            adjust_learning_rate(optimizer, epoch, opt)
 
-            valid_perplexity = torch.exp(total_valid_loss / total_valid_tokens)
-            print(f"Epoch {epoch+1}, Validation Perplexity: {valid_perplexity:.4f}")
-
-        # Save model checkpoint
-        if opt.savename:
-            torch.save(model.state_dict(), f"{opt.savename}_epoch_{epoch+1}.pth")
-
-    print("Training complete.")
+        # Save model weights if a save directory is specified
+        if hasattr(opt, 'savename'):
+            torch.save(model.state_dict(), f"{opt.savename}/model_epoch_{epoch+1}.pth")
+            
+def adjust_learning_rate(optimizer, epoch, opt):
+    # Example of a simple step decay
+    initial_lr = 0.01  # Define initial learning rate or retrieve from opt
+    lr_decay = 0.95  # Define decay rate
+    optimizer.param_groups[0]['lr'] = initial_lr * (lr_decay ** epoch)
+    
+def create_masks(trg_input):
+    size = trg_input.size(1)
+    no_peek_mask = torch.tril(torch.ones((size, size), dtype=torch.bool))
+    return no_peek_mask.to(trg_input.device)
     
     # write code to:
     #  1. create a nopeak mask
@@ -481,7 +488,7 @@ def main():
     random.seed(10)
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-no_cuda', action='store_true')
+    parser.add_argument('-no_cuda', action='store_true',defualt=True)
     parser.add_argument('-SGDR', action='store_true')
     parser.add_argument('-epochs', type=int, default=1)
     parser.add_argument('-d_model', type=int, default=512)
@@ -529,11 +536,10 @@ def main():
     train_dataset = TextDataset(opt.train)
     valid_dataset = TextDataset(opt.valid)
     test_dataset = TextDataset(opt.test)
-    
+
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, drop_last=True)
     valid_loader = DataLoader(valid_dataset, batch_size=32, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True, drop_last=True)
-   
     
     obs = len(opt.train)
     opt.vocab_size = 50257
