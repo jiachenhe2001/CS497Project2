@@ -391,10 +391,11 @@ def train_model(model, opt, train_loader,valid_loader):
 
     #train loop
     for epoch in range(opt.epochs):
-        # print("epoch %d" % (epoch))
+        print("epoch %d" % (epoch))
         total_train_loss = 0
+        print(len(train_loader))
         for batch in train_loader:
-            # print("batch")
+            #print(batch)
             # Your training logic here
             inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
             inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
@@ -472,7 +473,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
     parser.add_argument('-dropout', type=int, default=0.1)
-    parser.add_argument('-batchsize', type=int, default=1)
+    parser.add_argument('-batchsize', type=int, default=2)
     parser.add_argument('-printevery', type=int, default=100)
     parser.add_argument('-lr', type=int, default=0.00001)
     parser.add_argument('-seqlen', type=int, default=512)
@@ -487,8 +488,8 @@ def main():
     opt.verbose = False    
     
     opt.device = 0 if opt.no_cuda is False else -1
-    if opt.device == 0:
-        assert torch.cuda.is_available()
+    #if opt.device == 0:
+    #    assert torch.cuda.is_available()
     opt.device = torch.device("cuda:0")
     opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
@@ -508,18 +509,37 @@ def main():
     opt.valid = read_corpus('wiki2.valid.txt',tokenizer)
     opt.test = read_corpus('wiki2.test.txt',tokenizer)
     
+    
+    
     #change 
-    train_dataset = TextDataset(opt.train)
-    valid_dataset = TextDataset(opt.valid)
+    def create_fixed_length_sequences(data, sequence_length):
+        # Split the data into chunks of `sequence_length`, discarding the remainder
+        num_full_batches = len(data) // sequence_length
+        # Slice the data to ensure it's a multiple of `sequence_length`
+        truncated_length = num_full_batches * sequence_length
+        sequences = data[:truncated_length].view(-1, sequence_length)
+        return sequences
+    
+    print(len(opt.train))
+    train_dataset = torch.tensor(opt.train)
+    train_dataset = create_fixed_length_sequences(train_dataset,opt.seqlen)
+    train_dataset = TextDataset(train_dataset)
+    print(len(train_dataset))
+    
+    valid_dataset = torch.tensor(opt.valid)
+    valid_dataset = create_fixed_length_sequences(valid_dataset,opt.seqlen)
+    valid_dataset = TextDataset(valid_dataset)
+    
     test_dataset = TextDataset(opt.test)
     
 
-    batch_size = 1
-    
-    train_loader = DataLoader(train_dataset, batch_size= batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
-   
+    batch_size = opt.batchsize
+    #train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    #valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    #test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     
     obs = len(opt.train)
     opt.vocab_size = 50257
@@ -527,7 +547,7 @@ def main():
     for i in range(opt.vocab_size):
         temp.append(i)
     opt.indices = torch.tensor(temp)
-    opt.indices = opt.indices.cuda()
+    #opt.indices = opt.indices.cuda()
     
     model = get_model(opt,opt.vocab_size,opt.vocab_size)
         
