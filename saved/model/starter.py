@@ -388,46 +388,114 @@ def train_model(model, opt, train_loader,valid_loader):
     
     print("training model...")
     model.train()
+            # Set device based on availability of CUDA
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
 
-    #train loop
     for epoch in range(opt.epochs):
-        print("epoch %d" % (epoch))
-        total_loss = 0
-        for inputs, targets in train_loader:
-            # Your training logic here
-            inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
+        #model.train()  # Set model to training mode
+        total_train_loss = 0
+        total_train_tokens = 0
 
-            # Forward pass
-            outputs = model(inputs)
-            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+        for batch in train_loader:
+            trg = batch.to(device)
 
-            # Backward and optimize
-            opt.optimizer.zero_grad()
+            # Prepare input and targets by shifting
+            trg_input = trg[:-1]
+            trg_output = trg[1:]
+
+            # Create no-peek mask
+            trg_mask = (torch.tril(torch.ones((trg_input.size(1), trg_input.size(1)), device=device)) == 1)
+
+            optimizer.zero_grad()
+            output = model(trg_input, trg_mask=trg_mask)
+
+            output_flat = output.view(-1, output.size(-1))
+            trg_output_flat = trg_output.view(-1)
+
+            loss = F.cross_entropy(output_flat, trg_output_flat, ignore_index=opt.trg_pad)
             loss.backward()
-            opt.optimizer.step()
-            
-            if opt.SGDR == True:
-                opt.sched.step()
+            optimizer.step()
 
-            total_train_loss += loss.item()
+            total_train_loss += loss.item() * (trg_output != opt.trg_pad).sum().item()
+            total_train_tokens += (trg_output != opt.trg_pad).sum().item()
+
+        # Calculate training perplexity
+        train_perplexity = torch.exp(total_train_loss / total_train_tokens)
+        print(f"Epoch {epoch+1}, Training Perplexity: {train_perplexity:.4f}")
+
+        # Validation phase
+        model.eval()
+        total_valid_loss = 0
+        total_valid_tokens = 0
+        with torch.no_grad():
+            for batch in valid_loader:
+                trg = batch.to(device)
+
+                trg_input = trg[:-1]
+                trg_output = trg[1:]
+
+                trg_mask = (torch.tril(torch.ones((trg_input.size(1), trg_input.size(1)), device=device)) == 1)
+                output = model(trg_input, trg_mask=trg_mask)
+
+                output_flat = output.view(-1, output.size(-1))
+                trg_output_flat = trg_output.view(-1)
+
+                loss = F.cross_entropy(output_flat, trg_output_flat, ignore_index=opt.trg_pad)
+
+                total_valid_loss += loss.item() * (trg_output != opt.trg_pad).sum().item()
+                total_valid_tokens += (trg_output != opt.trg_pad).sum().item()
+
+            valid_perplexity = torch.exp(total_valid_loss / total_valid_tokens)
+            print(f"Epoch {epoch+1}, Validation Perplexity: {valid_perplexity:.4f}")
+
+        # Save model checkpoint
+        if opt.savename:
+            torch.save(model.state_dict(), f"{opt.savename}_epoch_{epoch+1}.pth")
+
+    print("Training complete.")
+
+
+    # train loop
+    # for epoch in range(opt.epochs):
+    #     print("epoch %d" % (epoch))
+    #     total_loss = 0
+    #     for inputs, targets in train_loader:
+    #         # Your training logic here
+    #         inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
+
+    #         # Forward pass
+    #         outputs = model(inputs)
+    #         loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+    #         # Backward and optimize
+    #         opt.optimizer.zero_grad()
+    #         loss.backward()
+    #         opt.optimizer.step()
             
-        avg_train_loss = total_train_loss / len(train_loader)
-        print(f"Train loss: {avg_train_loss}")
+    #         if opt.SGDR == True:
+    #             opt.sched.step()
+
+    #         total_train_loss += loss.item()
+            
+    #     avg_train_loss = total_train_loss / len(train_loader)
+    #     print(f"Train loss: {avg_train_loss}")
             
     
-    # Validation loop
-    model.eval()
-    total_valid_loss = 0
-    with torch.no_grad():
-        for inputs, targets in valid_loader:
-            inputs, targets = inputs.to(model.device), targets.to(model.device)
-            outputs = model(inputs)
-            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-            total_valid_loss += loss.item()
+    # # Validation loop
+    # model.eval()
+    # total_valid_loss = 0
+    # with torch.no_grad():
+    #     for inputs, targets in valid_loader:
+    #         inputs, targets = inputs.to(model.device), targets.to(model.device)
+    #         outputs = model(inputs)
+    #         loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+    #         total_valid_loss += loss.item()
 
-    # Calculate average validation loss
-    avg_valid_loss = total_valid_loss / len(valid_loader)
-    print(f"Validation loss: {avg_valid_loss}")
+    # # Calculate average validation loss
+    # avg_valid_loss = total_valid_loss / len(valid_loader)
+    # print(f"Validation loss: {avg_valid_loss}")
     
     
     
@@ -479,9 +547,9 @@ def main():
     opt.verbose = False    
     
     opt.device = 0 if opt.no_cuda is False else -1
-    if opt.device == 0:
-        assert torch.cuda.is_available()
-    opt.device = torch.device("cuda:0")
+    #if opt.device == 0:
+    #    assert torch.cuda.is_available()
+    #opt.device = torch.device("cuda:0")
     opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
     opt.time_name = time_name
@@ -517,7 +585,7 @@ def main():
     for i in range(opt.vocab_size):
         temp.append(i)
     opt.indices = torch.tensor(temp)
-    opt.indices = opt.indices.cuda()
+    #opt.indices = opt.indices.cuda()
     
     model = get_model(opt,opt.vocab_size,opt.vocab_size)
         
