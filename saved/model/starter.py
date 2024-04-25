@@ -514,7 +514,8 @@ def main():
     valid_dataset = TextDataset(opt.valid)
     test_dataset = TextDataset(opt.test)
     
-    batch_size = 15
+    print(opt)
+    batch_size = 1
     
     train_loader = DataLoader(train_dataset, batch_size= batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
