@@ -309,7 +309,7 @@ class Decoder(nn.Module):
         return self.norm(x)
 
 # Decoder only, no cross attention
-# #change 
+# change 
 class DecoderOnlyLayer(nn.Module):
     def __init__(self, d_model, heads, dropout=0.1):
         super().__init__()
@@ -384,11 +384,21 @@ def get_model(opt, src_vocab, trg_vocab):
     
     return model
     
-def train_model(model, opt):
+def train_model(model, opt, train_loader,valid_loader):
     
     print("training model...")
     model.train()
+    # train loop
+    for batch in train_loader:
+        # Your training logic here
+        # e.g., pass 'batch' to your model and compute loss, etc.
+        pass
     
+    # Validation loop
+    model.eval()
+    for batch in valid_loader:
+        # Your evaluation logic here
+        pass
     # write code to:
     #  1. create a nopeak mask
     #  2. feed training data to the model in batches
@@ -496,7 +506,7 @@ def main():
     opt.trg_pad = 0
     
     #change        
-    train_model(model,opt,train_loader, valid_loader)
+    train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
         
 if __name__ == "__main__":
