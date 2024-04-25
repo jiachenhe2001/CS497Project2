@@ -391,10 +391,10 @@ def train_model(model, opt, train_loader,valid_loader):
 
     #train loop
     for epoch in range(opt.epochs):
-        print("epoch %d" % (epoch))
+        # print("epoch %d" % (epoch))
         total_train_loss = 0
         for batch in train_loader:
-            print("batch")
+            # print("batch")
             # Your training logic here
             inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
             inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
@@ -502,7 +502,7 @@ def main():
     shutil.copy(source_name,dir_name + source_name)
     opt.log_file = dir_name + "log_file.txt"
     
-    
+    print(str(opt))
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     opt.train = read_corpus('wiki2.train.txt',tokenizer)
     opt.valid = read_corpus('wiki2.valid.txt',tokenizer)
@@ -513,8 +513,8 @@ def main():
     valid_dataset = TextDataset(opt.valid)
     test_dataset = TextDataset(opt.test)
     
-    print(opt)
-    batch_size = 1
+
+    batch_size = opt.batchsize
     
     train_loader = DataLoader(train_dataset, batch_size= batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
