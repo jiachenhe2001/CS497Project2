@@ -392,10 +392,13 @@ def train_model(model, opt, train_loader,valid_loader):
     #train loop
     for epoch in range(opt.epochs):
         print("epoch %d" % (epoch))
-        total_train_loss = 0
+        total_loss = 0
         for batch in train_loader:
             # Your training logic here
-            inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
+            print("batch")
+            print(batch)
+            
+            
             
             inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
 
