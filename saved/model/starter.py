@@ -490,7 +490,7 @@ def main():
     if opt.device == 0:
         assert torch.cuda.is_available()
     opt.device = torch.device("cuda:0")
-    opt.device = torch.device("cpu")
+    # opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
     opt.time_name = time_name
     dir_name = "saved/%s" % (opt.dir_name)
@@ -514,7 +514,8 @@ def main():
     test_dataset = TextDataset(opt.test)
     
 
-    batch_size = 1
+    # batch_size = opt.batchsize
+    batch_size = 2
     
     train_loader = DataLoader(train_dataset, batch_size= batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
