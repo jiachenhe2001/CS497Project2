@@ -394,13 +394,14 @@ def train_model(model, opt, train_loader,valid_loader):
         print("epoch %d" % (epoch))
         total_train_loss = 0
         for batch in train_loader:
+
             # Your training logic here
             inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
-            
             inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
 
             # Forward pass
-            outputs = model(inputs)
+            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=model.device), diagonal=1).bool()
+            outputs = model(inputs, inputmask)
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
             # Backward and optimize
@@ -453,6 +454,11 @@ def test_model(model, opt, epoch):
     # write code to generate perplexity of test set
     
     model.train()
+    
+def collate_fn(batch):
+    # 假设 batch 是一个标记列表，这里我们转换为 tensor
+    batch = torch.tensor(batch).unsqueeze(1)  # 增加一个序列长度维度
+    return batch
 
 def main():
     
@@ -496,7 +502,6 @@ def main():
     shutil.copy(source_name,dir_name + source_name)
     opt.log_file = dir_name + "log_file.txt"
     
-    print(str(opt))
     
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     opt.train = read_corpus('wiki2.train.txt',tokenizer)
@@ -508,9 +513,9 @@ def main():
     valid_dataset = TextDataset(opt.valid)
     test_dataset = TextDataset(opt.test)
     
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, drop_last=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=32, shuffle=True, drop_last=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True, drop_last=True)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    valid_loader = DataLoader(valid_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
    
     
     obs = len(opt.train)
@@ -540,7 +545,8 @@ def main():
     opt.src_pad = 0
     opt.trg_pad = 0
     
-    #change        
+    #change     
+    model.device = opt.device   
     train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
         
