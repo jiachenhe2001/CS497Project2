@@ -393,9 +393,10 @@ def train_model(model, opt, train_loader,valid_loader):
     for epoch in range(opt.epochs):
         print("epoch %d" % (epoch))
         total_train_loss = 0
+        total_train_tokens = 0
         print(len(train_loader))
         for batch in train_loader:
-            #print(batch)
+            # print(batch)
             # Your training logic here
             inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
             inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
@@ -413,25 +414,35 @@ def train_model(model, opt, train_loader,valid_loader):
             if opt.SGDR == True:
                 opt.sched.step()
 
-            total_train_loss += loss.item()
+            #total_train_loss += loss.item()
+            total_train_loss += loss.item() * inputs.size(0)
+            total_train_tokens += inputs.size(0)
             
-        avg_train_loss = total_train_loss / len(train_loader)
-        print(f"Train loss: {avg_train_loss}")
+        #avg_train_loss = total_train_loss / len(train_loader)
+        train_perplexity = torch.exp(total_train_loss / total_train_tokens)
+        print(f"Train perplexity: {train_perplexity}")
             
-    
-    # Validation loop
-    model.eval()
-    total_valid_loss = 0
-    with torch.no_grad():
-        for inputs, targets in valid_loader:
-            inputs, targets = inputs.to(model.device), targets.to(model.device)
-            outputs = model(inputs)
-            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-            total_valid_loss += loss.item()
+    model.eval()  # Set the model to evaluation mode
+    total_val_loss = 0
+    total_val_tokens = 0
 
-    # Calculate average validation loss
-    avg_valid_loss = total_valid_loss / len(valid_loader)
-    print(f"Validation loss: {avg_valid_loss}")
+    with torch.no_grad():  # Disable gradient computation
+        for batch in valid_loader:
+            inputs, targets = batch[:-1], batch[1:]
+            inputs, targets = inputs.to(opt.device), targets.to(opt.device)
+
+            # Forward pass
+            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
+            outputs = model(inputs, inputmask)
+            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+            #total_val_loss += loss.item()
+            total_val_loss += loss.item() * inputs.size(0)
+            total_val_tokens += inputs.size(0)
+            
+        #avg_val_loss = total_val_loss / len(valid_loader)
+        val_perplexity = torch.exp(total_val_loss / total_val_tokens)
+        print(f"Validation perplexity: {val_perplexity}")
     
     
     
@@ -448,12 +459,29 @@ def train_model(model, opt, train_loader,valid_loader):
     #  8. save model weights to file specified in opt.savename
     #  SEE trainer.py for examples of each of the above
     
-def test_model(model, opt, epoch):
+def test_model(model, opt, epoch,test_loader):
     print("testing model...")
     model.eval()
-    
-    # write code to generate perplexity of test set
-    
+    total_test_loss = 0
+    total_test_tokens = 0  
+    with torch.no_grad():  # Disable gradient computation
+        for batch in test_loader:
+            inputs, targets = batch[:-1], batch[1:]
+            inputs, targets = inputs.to(opt.device), targets.to(opt.device)
+
+            # Forward pass
+            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
+            outputs = model(inputs, inputmask)
+            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+            #total_test_loss += loss.item()
+            total_test_loss += loss.item() * inputs.size(0)
+            total_test_tokens += inputs.size(0)
+            
+
+        #avg_test_loss = total_test_loss / len(test_loader)
+        test_perplexity = torch.exp(total_test_loss / total_test_tokens)
+        print(f"Test perplexity: {test_perplexity}")
     model.train()
     
 def collate_fn(batch):
@@ -466,7 +494,7 @@ def main():
     random.seed(10)
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-no_cuda', action='store_true')
+    parser.add_argument('-no_cuda', action='store_true',default=True)
     parser.add_argument('-SGDR', action='store_true')
     parser.add_argument('-epochs', type=int, default=1)
     parser.add_argument('-d_model', type=int, default=512)
@@ -490,8 +518,8 @@ def main():
     opt.device = 0 if opt.no_cuda is False else -1
     #if opt.device == 0:
     #    assert torch.cuda.is_available()
-    opt.device = torch.device("cuda:0")
-    # opt.device = torch.device("cpu")
+    # opt.device = torch.device("cuda:0")
+    opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
     opt.time_name = time_name
     dir_name = "saved/%s" % (opt.dir_name)
