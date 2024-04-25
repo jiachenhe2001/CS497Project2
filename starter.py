@@ -394,13 +394,14 @@ def train_model(model, opt, train_loader,valid_loader):
         print("epoch %d" % (epoch))
         total_train_loss = 0
         for batch in train_loader:
-
+            print("batch")
+            print(batch.shape)
             # Your training logic here
             inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
-            inputs, targets = inputs.to(model.device), targets.to(model.device)  # Ensure data is on the correct device
+            inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
 
             # Forward pass
-            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=model.device), diagonal=1).bool()
+            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
             outputs = model(inputs, inputmask)
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
@@ -513,9 +514,11 @@ def main():
     valid_dataset = TextDataset(opt.valid)
     test_dataset = TextDataset(opt.test)
     
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
-    valid_loader = DataLoader(valid_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    batch_size = 2
+    
+    train_loader = DataLoader(train_dataset, batch_size= batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
    
     
     obs = len(opt.train)
@@ -546,7 +549,7 @@ def main():
     opt.trg_pad = 0
     
     #change     
-    model.device = opt.device   
+ 
     train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
         
