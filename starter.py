@@ -491,7 +491,7 @@ def main():
     #if opt.device == 0:
     #    assert torch.cuda.is_available()
     opt.device = torch.device("cuda:0")
-    opt.device = torch.device("cpu")
+    # opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
     opt.time_name = time_name
     dir_name = "saved/%s" % (opt.dir_name)
