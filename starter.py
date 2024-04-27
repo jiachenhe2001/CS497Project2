@@ -415,9 +415,8 @@ def train_model(model, opt, train_loader,valid_loader):
                 opt.sched.step()
 
             #total_train_loss += loss.item()
-            total_train_loss += loss.item() * inputs.size(0)
-            total_train_tokens += inputs.size(0)
-            
+            total_train_loss += loss.item() * targets.numel()  # targets.numel() gives the total number of target tokens
+            total_train_tokens += targets.numel()
         #avg_train_loss = total_train_loss / len(train_loader)
         train_perplexity = torch.exp(total_train_loss / total_train_tokens)
         print(f"Train perplexity: {train_perplexity}")
@@ -437,8 +436,8 @@ def train_model(model, opt, train_loader,valid_loader):
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
             #total_val_loss += loss.item()
-            total_val_loss += loss.item() * inputs.size(0)
-            total_val_tokens += inputs.size(0)
+            total_val_loss += loss.item() * targets.numel()
+            total_val_tokens += targets.numel()
             
         #avg_val_loss = total_val_loss / len(valid_loader)
         val_perplexity = torch.exp(total_val_loss / total_val_tokens)
@@ -475,8 +474,8 @@ def test_model(model, opt, epoch,test_loader):
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
             #total_test_loss += loss.item()
-            total_test_loss += loss.item() * inputs.size(0)
-            total_test_tokens += inputs.size(0)
+            total_test_loss += loss.item() * targets.numel()
+            total_test_tokens += targets.numel()
             
 
         #avg_test_loss = total_test_loss / len(test_loader)
