@@ -418,7 +418,7 @@ def train_model(model, opt, train_loader,valid_loader):
             total_train_loss += loss.item() * targets.numel()  # targets.numel() gives the total number of target tokens
             total_train_tokens += targets.numel()
         #avg_train_loss = total_train_loss / len(train_loader)
-        train_perplexity = torch.exp(total_train_loss / total_train_tokens)
+        train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
         print(f"Train perplexity: {train_perplexity}")
             
     model.eval()  # Set the model to evaluation mode
@@ -436,11 +436,11 @@ def train_model(model, opt, train_loader,valid_loader):
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
             #total_val_loss += loss.item()
-            total_val_loss += loss.item() * targets.numel()
-            total_val_tokens += targets.numel()
+            total_val_loss += loss.item() * inputs.size(0)
+            total_val_tokens += inputs.size(0)
             
         #avg_val_loss = total_val_loss / len(valid_loader)
-        val_perplexity = torch.exp(total_val_loss / total_val_tokens)
+        val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
         print(f"Validation perplexity: {val_perplexity}")
     
     
@@ -474,12 +474,12 @@ def test_model(model, opt, epoch,test_loader):
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
             #total_test_loss += loss.item()
-            total_test_loss += loss.item() * targets.numel()
-            total_test_tokens += targets.numel()
+            total_test_loss += loss.item() * inputs.size(0)
+            total_test_tokens += inputs.size(0)
             
 
         #avg_test_loss = total_test_loss / len(test_loader)
-        test_perplexity = torch.exp(total_test_loss / total_test_tokens)
+        test_perplexity = torch.exp(torch.tensor(total_test_loss / total_test_tokens))
         print(f"Test perplexity: {test_perplexity}")
     model.train()
     
@@ -495,7 +495,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-SGDR', action='store_true')
-    parser.add_argument('-epochs', type=int, default=1)
+    parser.add_argument('-epochs', type=int, default=10)
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
@@ -557,7 +557,9 @@ def main():
     valid_dataset = create_fixed_length_sequences(valid_dataset,opt.seqlen)
     valid_dataset = TextDataset(valid_dataset)
     
-    test_dataset = TextDataset(opt.test)
+    test_dataset = torch.tensor(opt.test)
+    test_dataset = create_fixed_length_sequences(test_dataset,opt.seqlen)
+    test_dataset = TextDataset(test_dataset)
     
 
     batch_size = opt.batchsize
