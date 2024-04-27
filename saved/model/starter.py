@@ -394,7 +394,6 @@ def train_model(model, opt, train_loader,valid_loader):
         print("epoch %d" % (epoch))
         total_train_loss = 0
         total_train_tokens = 0
-        print(len(train_loader))
         for batch in train_loader:
             # print(batch)
             # Your training logic here
@@ -495,12 +494,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-SGDR', action='store_true')
-    parser.add_argument('-epochs', type=int, default=10)
+    parser.add_argument('-epochs', type=int, default=3)
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
     parser.add_argument('-dropout', type=int, default=0.1)
-    parser.add_argument('-batchsize', type=int, default=2)
+    parser.add_argument('-batchsize', type=int, default=6)
     parser.add_argument('-printevery', type=int, default=100)
     parser.add_argument('-lr', type=int, default=0.00001)
     parser.add_argument('-seqlen', type=int, default=512)
@@ -601,6 +600,8 @@ def main():
  
     train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
+    torch.save(model, 'model.pth')
+
         
 if __name__ == "__main__":
     main()        
