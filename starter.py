@@ -385,67 +385,6 @@ def get_model(opt, src_vocab, trg_vocab):
     return model
     
 def train_model(model, opt, train_loader,valid_loader):
-    
-    print("training model...")
-    model.train()
-
-    #train loop
-    for epoch in range(opt.epochs):
-        print("epoch %d" % (epoch))
-        total_train_loss = 0
-        total_train_tokens = 0
-        print(len(train_loader))
-        for batch in train_loader:
-            # print(batch)
-            # Your training logic here
-            inputs, targets = batch[:-1], batch[1:]  # Input is the current token, target is the next token
-            inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
-
-            # Forward pass
-            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
-            outputs = model(inputs, inputmask)
-            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-
-            # Backward and optimize
-            opt.optimizer.zero_grad()
-            loss.backward()
-            opt.optimizer.step()
-            
-            if opt.SGDR == True:
-                opt.sched.step()
-
-            #total_train_loss += loss.item()
-            total_train_loss += loss.item() * targets.numel()  # targets.numel() gives the total number of target tokens
-            total_train_tokens += targets.numel()
-        #avg_train_loss = total_train_loss / len(train_loader)
-        train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
-        print(f"Train perplexity: {train_perplexity}")
-            
-    model.eval()  # Set the model to evaluation mode
-    total_val_loss = 0
-    total_val_tokens = 0
-
-    with torch.no_grad():  # Disable gradient computation
-        for batch in valid_loader:
-            inputs, targets = batch[:-1], batch[1:]
-            inputs, targets = inputs.to(opt.device), targets.to(opt.device)
-
-            # Forward pass
-            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
-            outputs = model(inputs, inputmask)
-            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-
-            #total_val_loss += loss.item()
-            total_val_loss += loss.item() * inputs.size(0)
-            total_val_tokens += inputs.size(0)
-            
-        #avg_val_loss = total_val_loss / len(valid_loader)
-        val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
-        print(f"Validation perplexity: {val_perplexity}")
-    
-    
-    
-    
     # write code to:
     #  1. create a nopeak mask
     #  2. feed training data to the model in batches
@@ -457,28 +396,92 @@ def train_model(model, opt, train_loader,valid_loader):
     #  7. generate a test perplexity once per training epoch by calling test_model()
     #  8. save model weights to file specified in opt.savename
     #  SEE trainer.py for examples of each of the above
+    print("training model...")
+    model.train()
+
+    #train loop
+    for epoch in range(opt.epochs):
+        print("epoch %d" % (epoch))
+        total_train_loss = 0
+        total_train_tokens = 0
+        #print(len(train_loader))
+        inputmask = torch.triu(torch.ones((1, 511, 511), device=opt.device), diagonal=1).bool()
+        inputmask = ~inputmask
+        for batch in train_loader:
+            # print(batch)
+            # Your training logic here
+            print(batch.shape)
+            inputs, targets = batch[:,:-1], batch[:,1:]  # Input is the current token, target is the next token
+            inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
+
+            # Forward pass
+            outputs = model(inputs, inputmask)
+            loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+            # Backward and optimize
+            opt.optimizer.zero_grad()
+            loss.backward()
+            opt.optimizer.step()
+            
+            if opt.SGDR == True:
+                opt.sched.step()
+
+            total_train_loss += loss.item() * targets.numel()
+            total_train_tokens += targets.numel()
+            #total_train_loss += loss.item() * inputs.size(0)
+            #total_train_tokens += inputs.size(0)
+
+        train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
+        print(f"Train perplexity: {train_perplexity}")
+            
+        model.eval()  # Set the model to evaluation mode
+        total_val_loss = 0
+        total_val_tokens = 0
+
+        with torch.no_grad():  # Disable gradient computation
+            for batch in valid_loader:
+                inputs, targets = batch[:,:-1], batch[:,1:]
+                inputs, targets = inputs.to(opt.device), targets.to(opt.device)
+
+                # Forward pass
+                # inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
+                outputs = model(inputs, inputmask)
+                loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+                total_val_loss += loss.item() * targets.numel()
+                total_val_tokens += targets.numel()
+                #total_val_loss += loss.item() * inputs.size(0)
+                #total_val_tokens += inputs.size(0)
+                
+            val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
+            print(f"Validation perplexity: {val_perplexity}")
     
-def test_model(model, opt, epoch,test_loader):
+    if hasattr(opt, 'savename'):
+        torch.save(model.state_dict(), f"{opt.savename}/model_final.pth")
+        print(f"Model saved to {opt.savename}/model_final.pth")
+    
+def test_model(model, opt, epoch, test_loader):
     print("testing model...")
     model.eval()
     total_test_loss = 0
     total_test_tokens = 0  
     with torch.no_grad():  # Disable gradient computation
+        inputmask = torch.triu(torch.ones((1, 511, 511), device=opt.device), diagonal=1).bool()
+        inputmask = ~inputmask
         for batch in test_loader:
-            inputs, targets = batch[:-1], batch[1:]
+            inputs, targets = batch[:,:-1], batch[:,1:]
             inputs, targets = inputs.to(opt.device), targets.to(opt.device)
 
             # Forward pass
-            inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
+            #inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
             outputs = model(inputs, inputmask)
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
-
-            #total_test_loss += loss.item()
-            total_test_loss += loss.item() * inputs.size(0)
-            total_test_tokens += inputs.size(0)
             
-
-        #avg_test_loss = total_test_loss / len(test_loader)
+            total_test_loss += loss.item() * targets.numel()
+            total_test_tokens += targets.numel()
+            #total_test_loss += loss.item() * inputs.size(0)
+            #total_test_tokens += inputs.size(0)
+            
         test_perplexity = torch.exp(torch.tensor(total_test_loss / total_test_tokens))
         print(f"Test perplexity: {test_perplexity}")
     model.train()
@@ -495,7 +498,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-SGDR', action='store_true')
-    parser.add_argument('-epochs', type=int, default=10)
+    parser.add_argument('-epochs', type=int, default=20)
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
