@@ -410,7 +410,6 @@ def train_model(model, opt, train_loader,valid_loader):
         for batch in train_loader:
             # print(batch)
             # Your training logic here
-            print(batch.shape)
             inputs, targets = batch[:,:-1], batch[:,1:]  # Input is the current token, target is the next token
             inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
 
@@ -456,9 +455,6 @@ def train_model(model, opt, train_loader,valid_loader):
             val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
             print(f"Validation perplexity: {val_perplexity}")
     
-    if hasattr(opt, 'savename'):
-        torch.save(model.state_dict(), f"{opt.savename}/model_final.pth")
-        print(f"Model saved to {opt.savename}/model_final.pth")
     
 def test_model(model, opt, epoch, test_loader):
     print("testing model...")
@@ -498,12 +494,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-SGDR', action='store_true')
-    parser.add_argument('-epochs', type=int, default=20)
+    parser.add_argument('-epochs', type=int, default=7)
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
     parser.add_argument('-dropout', type=int, default=0.1)
-    parser.add_argument('-batchsize', type=int, default=6)
+    parser.add_argument('-batchsize', type=int, default=7)
     parser.add_argument('-printevery', type=int, default=100)
     parser.add_argument('-lr', type=int, default=0.00001)
     parser.add_argument('-seqlen', type=int, default=512)
@@ -604,7 +600,8 @@ def main():
  
     train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
-    torch.save(model, 'model.pth')
+    # torch.save(model, 'model.pth')
+    torch.save(model.state_dict(), 'model_params.pth')
 
         
 if __name__ == "__main__":
