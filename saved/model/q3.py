@@ -534,17 +534,16 @@ def main():
     opt = parser.parse_args()
     opt.verbose = False    
     
-    opt.device = 0 if opt.no_cuda is False else -1
-    if opt.device == 0:
-       assert torch.cuda.is_available()
-    opt.device = torch.device("cuda:0")
+    # opt.device = 0 if opt.no_cuda is False else -1
+    # if opt.device == 0:
+    #    assert torch.cuda.is_available()
+    # opt.device = torch.device("cuda:0")
 
-    # if not opt.no_cuda and torch.backends.mps.is_available():
-    #     opt.device = torch.device("mps")
-    #     print("Using mps for device\n")
-    # else:
-    #     opt.device = torch.device("cpu")
-
+    if not opt.no_cuda and torch.backends.mps.is_available():
+        opt.device = torch.device("mps")
+        print("Using mps for device\n")
+    else:
+        opt.device = torch.device("cpu")
     #opt.device = torch.device("cpu")
     time_name = time.strftime("%y%m%d_%H%M%S")
     opt.time_name = time_name
@@ -603,8 +602,8 @@ def main():
     for i in range(opt.vocab_size):
         temp.append(i)
     opt.indices = torch.tensor(temp)
-    opt.indices = opt.indices.cuda()
-    # opt.indices = opt.indices.to(opt.device)
+    # opt.indices = opt.indices.cuda()
+    opt.indices = opt.indices.to(opt.device)
     
     model = get_model(opt,opt.vocab_size,opt.vocab_size)
         
