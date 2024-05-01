@@ -160,7 +160,7 @@ class MultiHeadAttention(nn.Module):
         
 
         # calculate attention using function we will define next
-        scores = euclidean_attention(q, k, v, self.d_k, mask, self.dropout)
+        scores = euclidean_attention(q, k, v, mask, self.dropout)
         # concatenate heads and put through final linear layer
         concat = scores.transpose(1,2).contiguous()\
         .view(bs, -1, self.d_model)
