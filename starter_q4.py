@@ -17,6 +17,8 @@ from transformers import GPT2TokenizerFast
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
+import matplotlib.pyplot as plt
+
 
 #change 
 class TextDataset(Dataset):
@@ -380,7 +382,7 @@ def train_model(model, opt, train_loader,valid_loader):
     #  SEE trainer.py for examples of each of the above
     print("training model...")
     model.train()
-
+    learning_rates = []
     #train loop
     for epoch in range(opt.epochs):
         print("epoch %d" % (epoch))
@@ -407,6 +409,10 @@ def train_model(model, opt, train_loader,valid_loader):
             if opt.SGDR == True:
                 opt.sched.step()
 
+            current_lr = opt.optimizer.param_groups[0]['lr']
+            learning_rates.append(current_lr)
+            print(current_lr)
+            
             total_train_loss += loss.item() * targets.numel()
             total_train_tokens += targets.numel()
             #total_train_loss += loss.item() * inputs.size(0)
@@ -437,6 +443,7 @@ def train_model(model, opt, train_loader,valid_loader):
             val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
             print(f"Validation perplexity: {val_perplexity}")
     
+    plot_learning_rate(learning_rates)
     
 def test_model(model, opt, epoch, test_loader):
     print("testing model...")
@@ -469,6 +476,17 @@ def collate_fn(batch):
     batch = torch.tensor(batch).unsqueeze(1)  # 增加一个序列长度维度
     return batch
 
+def plot_learning_rate(learning_rates, filename='learning_rate_curve.png'):
+    plt.figure(figsize=(10, 5))
+    plt.plot(learning_rates, label='Learning Rate')
+    plt.xlabel('Training Iterations')
+    plt.ylabel('Learning Rate')
+    plt.title('Learning Rate Curve')
+    plt.legend()
+    plt.savefig(filename)
+    plt.close()
+    print(f"Plot saved as {filename}")
+
 def main():
     
     random.seed(10)
@@ -476,7 +494,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-no_cuda', action='store_true')
     parser.add_argument('-SGDR', action='store_true')
-    parser.add_argument('-epochs', type=int, default=7)
+    parser.add_argument('-epochs', type=int, default=8)
     parser.add_argument('-d_model', type=int, default=512)
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
