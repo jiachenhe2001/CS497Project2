@@ -108,13 +108,28 @@ def attention(q, k, v, d_k, mask=None, dropout=None):
     output = torch.matmul(scores, v)
     return output
 
-def euclidean_attention(q, k, v, mask=None, dropout=None):
-    q_expanded = q.unsqueeze(3)
-    k_expanded = k.unsqueeze(2)
+# def euclidean_attention(q, k, v, mask=None, dropout=None):
+#     q_expanded = q.unsqueeze(3)
+#     k_expanded = k.unsqueeze(2)
 
-    distance = torch.sum((q_expanded - k_expanded) ** 2, dim=-1)
+#     distance = torch.sum((q_expanded - k_expanded) ** 2, dim=-1)
     
-    scores = -distance
+#     scores = -distance
+
+#     if mask is not None:
+#         mask = mask.unsqueeze(1)
+#         scores = scores.masked_fill(mask == 0, float('-inf'))
+    
+#     scores = F.softmax(scores, dim=-1)
+    
+#     if dropout is not None:
+#         scores = dropout(scores)
+        
+#     output = torch.matmul(scores, v)
+#     return output
+
+def euclidean_attention(q, k, v, mask=None, dropout=None):
+    scores = -torch.cdist(q, k, p=2)**2
 
     if mask is not None:
         mask = mask.unsqueeze(1)
@@ -127,6 +142,7 @@ def euclidean_attention(q, k, v, mask=None, dropout=None):
         
     output = torch.matmul(scores, v)
     return output
+
 
 
 class MultiHeadAttention(nn.Module):
@@ -520,7 +536,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
     parser.add_argument('-dropout', type=int, default=0.1)
-    parser.add_argument('-batchsize', type=int, default=7)
+    parser.add_argument('-batchsize', type=int, default=4)
     parser.add_argument('-printevery', type=int, default=100)
     parser.add_argument('-lr', type=int, default=0.00001)
     parser.add_argument('-seqlen', type=int, default=512)
