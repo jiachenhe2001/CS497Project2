@@ -20,6 +20,11 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 
+train_losses = []
+
+vali_losses = []
+
+
 #change 
 class TextDataset(Dataset):
     def __init__(self, data):
@@ -382,7 +387,7 @@ def train_model(model, opt, train_loader,valid_loader):
     #  SEE trainer.py for examples of each of the above
     print("training model...")
     model.train()
-    learning_rates = []
+    #learning_rates = []
     #train loop
     for epoch in range(opt.epochs):
         print("epoch %d" % (epoch))
@@ -409,9 +414,9 @@ def train_model(model, opt, train_loader,valid_loader):
             if opt.SGDR == True:
                 opt.sched.step()
 
-            current_lr = opt.optimizer.param_groups[0]['lr']
-            learning_rates.append(current_lr)
-            print(current_lr)
+            #current_lr = opt.optimizer.param_groups[0]['lr']
+            #learning_rates.append(current_lr)
+            #print(current_lr)
             
             total_train_loss += loss.item() * targets.numel()
             total_train_tokens += targets.numel()
@@ -420,6 +425,7 @@ def train_model(model, opt, train_loader,valid_loader):
 
         train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
         print(f"Train perplexity: {train_perplexity}")
+        train_losses.append(train_perplexity)
             
         model.eval()  # Set the model to evaluation mode
         total_val_loss = 0
@@ -442,8 +448,9 @@ def train_model(model, opt, train_loader,valid_loader):
                 
             val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
             print(f"Validation perplexity: {val_perplexity}")
+            vali_losses.append(val_perplexity)
     
-    plot_learning_rate(learning_rates)
+    #plot_learning_rate(learning_rates)
     
 def test_model(model, opt, epoch, test_loader):
     print("testing model...")
@@ -602,6 +609,22 @@ def main():
     test_model(model,opt,-1,test_loader)
     # torch.save(model, 'model.pth')
     torch.save(model.state_dict(), 'model_params.pth')
+
+    plt.figure(figsize=(20, 15))
+
+    plt.plot(train_losses, label='Training Loss')
+
+    plt.plot(vali_losses, label='Validation Loss')
+
+    plt.title('Training and Validation Losses')
+
+    plt.xlabel('Epochs')
+
+    plt.ylabel('Loss')
+
+    plt.legend()
+
+    plt.show()
 
         
 if __name__ == "__main__":
