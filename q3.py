@@ -17,6 +17,9 @@ from transformers import GPT2TokenizerFast
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
+import matplotlib.pyplot as plt
+
+
 #change 
 class TextDataset(Dataset):
     def __init__(self, data):
@@ -108,28 +111,13 @@ def attention(q, k, v, d_k, mask=None, dropout=None):
     output = torch.matmul(scores, v)
     return output
 
-# def euclidean_attention(q, k, v, mask=None, dropout=None):
-#     q_expanded = q.unsqueeze(3)
-#     k_expanded = k.unsqueeze(2)
-
-#     distance = torch.sum((q_expanded - k_expanded) ** 2, dim=-1)
-    
-#     scores = -distance
-
-#     if mask is not None:
-#         mask = mask.unsqueeze(1)
-#         scores = scores.masked_fill(mask == 0, float('-inf'))
-    
-#     scores = F.softmax(scores, dim=-1)
-    
-#     if dropout is not None:
-#         scores = dropout(scores)
-        
-#     output = torch.matmul(scores, v)
-#     return output
-
 def euclidean_attention(q, k, v, mask=None, dropout=None):
-    scores = -torch.cdist(q, k, p=2)**2
+    q_expanded = q.unsqueeze(3)
+    k_expanded = k.unsqueeze(2)
+
+    distance = torch.sum((q_expanded - k_expanded) ** 2, dim=-1)
+    
+    scores = -distance
 
     if mask is not None:
         mask = mask.unsqueeze(1)
@@ -142,6 +130,21 @@ def euclidean_attention(q, k, v, mask=None, dropout=None):
         
     output = torch.matmul(scores, v)
     return output
+
+# def euclidean_attention(q, k, v, mask=None, dropout=None):
+#     scores = -torch.cdist(q, k, p=2)**2
+
+#     if mask is not None:
+#         mask = mask.unsqueeze(1)
+#         scores = scores.masked_fill(mask == 0, float('-inf'))
+    
+#     scores = F.softmax(scores, dim=-1)
+    
+#     if dropout is not None:
+#         scores = dropout(scores)
+        
+#     output = torch.matmul(scores, v)
+#     return output
 
 
 
@@ -421,36 +424,100 @@ def get_model(opt, src_vocab, trg_vocab):
     
     return model
     
-def train_model(model, opt, train_loader,valid_loader):
-    # write code to:
-    #  1. create a nopeak mask
-    #  2. feed training data to the model in batches
-    #  3. send the indices of training tokens to the GPU
-    #  4. linearize the predictions and compute the loss against ground truth
-    #     (you can use F.cross_entropy or write your own code)
-    #  5. calculate and apply the gradients with loss.backward() and optimizer.step()
-    #  6. report intermediate trainining perplexity
-    #  7. generate a test perplexity once per training epoch by calling test_model()
-    #  8. save model weights to file specified in opt.savename
-    #  SEE trainer.py for examples of each of the above
+# def train_model(model, opt, train_loader,valid_loader):
+#     # write code to:
+#     #  1. create a nopeak mask
+#     #  2. feed training data to the model in batches
+#     #  3. send the indices of training tokens to the GPU
+#     #  4. linearize the predictions and compute the loss against ground truth
+#     #     (you can use F.cross_entropy or write your own code)
+#     #  5. calculate and apply the gradients with loss.backward() and optimizer.step()
+#     #  6. report intermediate trainining perplexity
+#     #  7. generate a test perplexity once per training epoch by calling test_model()
+#     #  8. save model weights to file specified in opt.savename
+#     #  SEE trainer.py for examples of each of the above
+#     print("training model...")
+#     model.train()
+
+#     #train loop
+#     for epoch in range(opt.epochs):
+#         print("epoch %d" % (epoch))
+#         total_train_loss = 0
+#         total_train_tokens = 0
+#         #print(len(train_loader))
+#         inputmask = torch.triu(torch.ones((1, 511, 511), device=opt.device), diagonal=1).bool()
+#         inputmask = ~inputmask
+
+#         for batch in train_loader:
+#             # print(batch)
+#             # Your training logic here
+#             inputs, targets = batch[:,:-1], batch[:,1:]  # Input is the current token, target is the next token
+#             inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
+
+#             # Forward pass
+#             outputs = model(inputs, inputmask)
+#             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+#             # Backward and optimize
+#             opt.optimizer.zero_grad()
+#             loss.backward()
+#             opt.optimizer.step()
+            
+#             if opt.SGDR == True:
+#                 opt.sched.step()
+
+#             total_train_loss += loss.item() * targets.numel()
+#             total_train_tokens += targets.numel()
+#             #total_train_loss += loss.item() * inputs.size(0)
+#             #total_train_tokens += inputs.size(0)
+
+#         train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
+#         print(f"Train perplexity: {train_perplexity}")
+            
+#         model.eval()  # Set the model to evaluation mode
+#         total_val_loss = 0
+#         total_val_tokens = 0
+
+#         with torch.no_grad():  # Disable gradient computation
+#             for batch in valid_loader:
+#                 inputs, targets = batch[:,:-1], batch[:,1:]
+#                 inputs, targets = inputs.to(opt.device), targets.to(opt.device)
+
+#                 # Forward pass
+#                 # inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
+#                 outputs = model(inputs, inputmask)
+#                 loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
+
+#                 total_val_loss += loss.item() * targets.numel()
+#                 total_val_tokens += targets.numel()
+#                 #total_val_loss += loss.item() * inputs.size(0)
+#                 #total_val_tokens += inputs.size(0)
+                
+#             val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
+#             print(f"Validation perplexity: {val_perplexity}")
+
+
+def train_model(model, opt, train_loader, valid_loader):
     print("training model...")
     model.train()
 
-    #train loop
+    # Lists to hold perplexity values for plotting later
+    train_perplexities = []
+    valid_perplexities = []
+
     for epoch in range(opt.epochs):
-        print("epoch %d" % (epoch))
+        print("Epoch %d" % (epoch))
         total_train_loss = 0
         total_train_tokens = 0
-        #print(len(train_loader))
+
+        # No peak mask
         inputmask = torch.triu(torch.ones((1, 511, 511), device=opt.device), diagonal=1).bool()
         inputmask = ~inputmask
-        for batch in train_loader:
-            # print(batch)
-            # Your training logic here
-            inputs, targets = batch[:,:-1], batch[:,1:]  # Input is the current token, target is the next token
-            inputs, targets = inputs.to(opt.device), targets.to(opt.device)  # Ensure data is on the correct device
 
-            # Forward pass
+        for batch in train_loader:
+            inputs, targets = batch[:, :-1], batch[:, 1:]
+            inputs, targets = inputs.to(opt.device), targets.to(opt.device)
+
             outputs = model(inputs, inputmask)
             loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
@@ -464,33 +531,32 @@ def train_model(model, opt, train_loader,valid_loader):
 
             total_train_loss += loss.item() * targets.numel()
             total_train_tokens += targets.numel()
-            #total_train_loss += loss.item() * inputs.size(0)
-            #total_train_tokens += inputs.size(0)
 
         train_perplexity = torch.exp(torch.tensor(total_train_loss / total_train_tokens))
+        train_perplexities.append(train_perplexity.item())
         print(f"Train perplexity: {train_perplexity}")
-            
-        model.eval()  # Set the model to evaluation mode
+
+        # Validation phase
+        model.eval()
         total_val_loss = 0
         total_val_tokens = 0
-
-        with torch.no_grad():  # Disable gradient computation
+        with torch.no_grad():
             for batch in valid_loader:
-                inputs, targets = batch[:,:-1], batch[:,1:]
+                inputs, targets = batch[:, :-1], batch[:, 1:]
                 inputs, targets = inputs.to(opt.device), targets.to(opt.device)
 
-                # Forward pass
-                # inputmask = torch.triu(torch.ones((1, inputs.size(1), inputs.size(1)), device=opt.device), diagonal=1).bool()
                 outputs = model(inputs, inputmask)
                 loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), targets.view(-1))
 
                 total_val_loss += loss.item() * targets.numel()
                 total_val_tokens += targets.numel()
-                #total_val_loss += loss.item() * inputs.size(0)
-                #total_val_tokens += inputs.size(0)
-                
+
             val_perplexity = torch.exp(torch.tensor(total_val_loss / total_val_tokens))
+            valid_perplexities.append(val_perplexity.item())
             print(f"Validation perplexity: {val_perplexity}")
+
+    return train_perplexities, valid_perplexities
+
     
     
 def test_model(model, opt, epoch, test_loader):
@@ -524,6 +590,20 @@ def collate_fn(batch):
     batch = torch.tensor(batch).unsqueeze(1)  # 增加一个序列长度维度
     return batch
 
+
+
+def plot_learning_curve(training_losses, validation_losses):
+    plt.figure(figsize=(10, 5))
+    plt.title("Learning Curve")
+    plt.plot(training_losses, label='Train Perplexity')
+    plt.plot(validation_losses, label='Validation Perplexity')
+    plt.xlabel('Epochs')
+    plt.ylabel('Perplexity')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def main():
     
     random.seed(10)
@@ -536,7 +616,7 @@ def main():
     parser.add_argument('-n_layers', type=int, default=6)
     parser.add_argument('-heads', type=int, default=8)
     parser.add_argument('-dropout', type=int, default=0.1)
-    parser.add_argument('-batchsize', type=int, default=4)
+    parser.add_argument('-batchsize', type=int, default=2)
     parser.add_argument('-printevery', type=int, default=100)
     parser.add_argument('-lr', type=int, default=0.00001)
     parser.add_argument('-seqlen', type=int, default=512)
@@ -579,8 +659,6 @@ def main():
     opt.valid = read_corpus('wiki2.valid.txt',tokenizer)
     opt.test = read_corpus('wiki2.test.txt',tokenizer)
     
-    
-    
     #change 
     def create_fixed_length_sequences(data, sequence_length):
         # Split the data into chunks of `sequence_length`, discarding the remainder
@@ -604,7 +682,6 @@ def main():
     test_dataset = create_fixed_length_sequences(test_dataset,opt.seqlen)
     test_dataset = TextDataset(test_dataset)
     
-
     batch_size = opt.batchsize
     #train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
     #valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=collate_fn)
@@ -643,10 +720,14 @@ def main():
     
     #change     
  
-    train_model(model,opt,train_loader,valid_loader)
+    training_perplexities, validation_perplexities = train_model(model,opt,train_loader,valid_loader)
     test_model(model,opt,-1,test_loader)
     # torch.save(model, 'model.pth')
     torch.save(model.state_dict(), 'model_params.pth')
+
+    # Assuming train_model returns the losses
+    # training_perplexities, validation_perplexities = train_model(model, opt, train_loader, valid_loader)
+    plot_learning_curve(training_perplexities, validation_perplexities)
 
         
 if __name__ == "__main__":
